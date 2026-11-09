@@ -1,0 +1,53 @@
+categorie;description;goid
+Immune system;Activation of the immune response;GO:0002253
+Immune system;Response to interferon-alpha;GO:0035455
+Immune system;Response to interferon-beta;GO:0035456
+Immune system;Cellular response to interferon-alpha;GO:0035457
+Immune system;Cellular response to interferon-beta;GO:0035458
+Immune system;Cellular response to interleukin-15;GO:0071350
+Immune system;Cellular response to interleukin-18;GO:0071351
+Immune system;Cellular response to interleukin-6;GO:0071354
+Immune system;Cellular response to interleukin-1;GO:007137
+Immune system;Regulation of interferon-alpha production;GO:0032647
+Immune system;Regulation of interferon-beta production;GO:0032648
+Vasculature;Regulation of cell adhesion;GO:0030155
+Vasculature;Actin cytoskeleton organization;GO:0030036
+Vasculature;Endothelial cell activation ;GO:0042118
+Vasculature;Fibroblast activation;GO:0072537
+Vasculature;Thrombocyte activation;GO:0071892
+Vasculature;Blood circulation;GO:0008015
+Vasculature;Regulation of blood circulation;GO:1903522
+Vasculature;Vascular endothelial growth factor receptor signaling pathway;GO:0048010
+Vasculature;Vascular endothelial growth factor signaling pathway;GO:0038084
+Vasculature;Blood coagulation, common pathway;GO:0072377
+Vasculature;Coagulation;GO:0050817
+Vasculature;Regulation of collagen fibril organization;GO:1904026
+Vasculature;Pulmonary artery endothelial tube morphogenesis;GO:0061155
+Vasculature;Blood coagulation fibrin clot formation;GO:0072378
+Vasculature;Thrombopoietin-mediated signalling pathway;GO:0038163
+Vasculature;Extracellular matrix;GO:0031012
+Vasculature;Extracellular matrix organization;GO:0030198
+Vasculature;Extracellular matrix structural constituent;GO:0005201
+Vasculature;Collagen-containing extracellular matrix;GO:0062023
+Vasculature;Blood vessel morphogenesis;GO:0048514
+Vasculature;Branching involved in blood vessel morphogenesis;GO:0048514
+Vasculature;Apoptotic process involved in blood vessel morphogenesis;GO:1902262
+Vasculature;Regulation of blood vessel branching;GO:1905553
+Vasculature;Blood vessel remodelling;GO:0001974
+Vasculature;Angiogenesis;GO:0001525
+Vasculature;Vascular endothelial growth factor binding;GO:0038085
+Vasculature;Vascular endothelial growth factor production;GO:0010573
+Vasculature;Platelet-derived growth factor receptor signaling pathway;GO:0048008
+Vasculature;response to platelet-derived growth factor;GO:0036119
+Vasculature;platelet-derived growth factor receptor binding;GO:0005161
+Virus;Membrane fusion involved in viral entry into host cell;GO:0039663
+Virus;Modulation by virus of host process;GO:0019048
+Virus;Chromatin;GO:0000785
+Virus;Regulation of chromatin binding;GO:0035561
+Virus;Regulation of chromatin organization;GO:1902275
+Virus;Mitotic cell cycle;GO:0000278
+Virus;Response to virus;GO:0009615
+Virus;Defense response to virus;GO:0051607
+Virus;Viral genome replication;GO:0019079
+Virus;Chromosome segregation;GO:0007059
+Virus;Cell division;GO:0051301
