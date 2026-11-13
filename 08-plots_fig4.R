@@ -28,10 +28,6 @@ source("r-utils/r-overview.R")
 # - log2FC heatmaps of selected pathways.
 # - Per-sample expression heatmaps of selected pathways (DESeq2 normalized
 #   and vst data, the latter w/ the SARS-CoV-2 effect removed).
-#
-# Where two options exist, both are run and labelled:
-# - [SUBMITTED] reproduces the version sent for review.
-# - [REVISED]   corrected/alternative version.
 
 # User-defined parameters ----
 
@@ -200,7 +196,6 @@ pca_res <- run_pca_top_var(assay(vsd_36))
 save_plasma_pca(
   pca_res, md_36[, .(id, batch, sars, plasma)],
   title = 'PCA on vst data for plasma effect analysis',
-  out_path = file.path(output_path, subset_path),
   file_name = 'pca-prcomp_plasma_36samples',
   shape = 'sars')
 
@@ -220,20 +215,19 @@ top_pc1_genes <- top_PC1[seq_len(N_TOP_PC1), GENELAB]
 
 rm(pca_res, loadings_PC1, vsd_36)
 
-### PCAs, DESeq2-normalized counts [SUBMITTED] ----
+### PCAs, DESeq2-normalized counts ----
 # Goal: reproduce the submitted PCA (top 500 most variable genes on
-# DESeq2-normalized counts, linear scale). Without a log transformation the
-# variance is dominated by highly expressed genes.
+# DESeq2-normalized counts).
 
 save_plasma_pca(
   run_pca_top_var(norm_mat_36), md_36[, .(id, batch, plasma)],
   title = 'PCA on DESeq2 normalized data for plasma effect analysis',
+  out_path = output_path,
   file_name = 'pca-prcomp_DESeqNorm_plasma_36samples')
 
-### PCAs, log2-CPM values [REVISED] ----
+### PCAs, log2-CPM values ----
 # Goal: select the top 500 most variable genes and run the PCA on the same
-# scale (TMM-normalized log2-CPM), so that gene selection is not driven by
-# the mean-variance relationship of raw counts.
+# scale (TMM-normalized log2-CPM).
 
 save_plasma_pca(
   run_pca_lcpm(counts(dds_36)), md_36[, .(id, batch, plasma)],
@@ -255,8 +249,6 @@ dds_12 <- DESeq(dds_12, test = 'Wald')
 norm_mat_12 <- counts(dds_12, normalized = TRUE)
 
 ### PCAs, vst-transformed ----
-# Note: the original call used the default ellipse.by = 'condition', a
-# column not passed to the plot; ellipses are drawn by plasma.
 
 vsd_12 <- DESeq2::vst(
   dds_12,
@@ -267,23 +259,23 @@ vsd_12 <- DESeq2::vst(
 save_plasma_pca(
   run_pca_top_var(assay(vsd_12)), md_12[, .(id, batch, plasma)],
   title = 'PCA on vst data for plasma effect analysis',
-  out_path = file.path(output_path, subset_path),
+  out_path =  subset_path,
   file_name = 'pca-prcomp_plasma')
 
-### PCAs, DESeq2-normalized counts [SUBMITTED] ----
+### PCAs, DESeq2-normalized counts ----
 
 save_plasma_pca(
   run_pca_top_var(norm_mat_12), md_12[, .(id, batch, plasma)],
   title = 'PCA on DESeq2 normalized data for plasma effect analysis',
-  out_path = file.path(output_path, subset_path),
+  out_path = subset_path,
   file_name = 'pca-prcomp_DESeqNorm_plasma')
 
-### PCAs, log2-CPM values [REVISED] ----
+### PCAs, log2-CPM values ----
 
 save_plasma_pca(
   run_pca_lcpm(counts(dds_12)), md_12[, .(id, batch, plasma)],
   title = 'PCA on log2-CPM data for plasma effect analysis',
-  out_path = file.path(output_path, subset_path),
+  out_path = subset_path,
   file_name = 'pca-prcomp_log2CPM_plasma')
 
 ## GSEA lollipop plots ----
@@ -370,10 +362,6 @@ for (i in seq_len(nrow(pathway_plots))) {
 
 ### vst data w/o SARS-CoV-2 effect ----
 # Goal: vst without design, then remove the SARS-CoV-2 effect with limma.
-# - [SUBMITTED] removeBatchEffect(batch = sars), no design. Original file
-#   names.
-# - [REVISED] removeBatchEffect(batch = sars, design = ~ plasma), which
-#   protects the plasma effect ('_design-plasma').
 
 dds_36_null <- make_dds_subset(
   dds,
@@ -389,20 +377,10 @@ vsd <- DESeq2::vst(
   nsub = 1000)
 
 expr_adj <- list(
-  submitted = list(
     suffix = '',
     mat = limma::removeBatchEffect(
       assay(vsd),
-      batch = vsd$sars)),
-  revised = list(
-    suffix = '_design-plasma',
-    mat = limma::removeBatchEffect(
-      assay(vsd),
-      batch = vsd$sars,
-      design = model.matrix(~ plasma, data = colData(vsd)))))
-
-message('Max. absolute difference between both corrections: ',
-        signif(max(abs(expr_adj$submitted$mat - expr_adj$revised$mat)), 3))
+      batch = vsd$sars))
 
 rm(dds_36_null, vsd)
 
@@ -412,29 +390,26 @@ extra_heatmaps <- list(
   list(genes = select_pathways$tnfa.3, tag = 'TNFa_signalling-14genes', height = 4),
   list(genes = top_pc1_genes,          tag = paste0('PCA-top', N_TOP_PC1), height = 6))
 
-for (ea in expr_adj) {
+for (i in seq_len(nrow(pathway_plots))) {
+  pp <- pathway_plots[i]
 
-  for (i in seq_len(nrow(pathway_plots))) {
-    pp <- pathway_plots[i]
+  p <- do_heatmap_gex_per_sample(expr_adj$mat, select_pathways[[pp$set]], md_36, features_db)
 
-    p <- do_heatmap_gex_per_sample(ea$mat, select_pathways[[pp$set]], md_36, features_db)
+  save_pheatmap_svg(
+    p,
+    file.path(output_path, paste0('heatmap_plasma-effect_', PVALtag, EXPtag,
+                                  TARGET_CMP, '-', pp$tag, expr_adj$suffix, '.svg')),
+    width = 10, height = pp$vst_height)
+}
 
-    save_pheatmap_svg(
-      p,
-      file.path(output_path, paste0('heatmap_plasma-effect_', PVALtag, EXPtag,
-                                    TARGET_CMP, '-', pp$tag, ea$suffix, '.svg')),
-      width = 10, height = pp$vst_height)
-  }
-
-  for (eh in extra_heatmaps) {
-    p <- do_heatmap_gex_per_sample(ea$mat, eh$genes, md_36, features_db)
-
-    save_pheatmap_svg(
-      p,
-      file.path(output_path, paste0('heatmap_plasma-effect_', PVALtag, EXPtag,
-                                    TARGET_CMP, '-', eh$tag, ea$suffix, '.svg')),
-      width = 10, height = eh$height)
-  }
+for (eh in extra_heatmaps) {
+  p <- do_heatmap_gex_per_sample(expr_adj$mat, eh$genes, md_36, features_db)
+  
+  save_pheatmap_svg(
+    p,
+    file.path(output_path, paste0('heatmap_plasma-effect_', PVALtag, EXPtag,
+                                  TARGET_CMP, '-', eh$tag, expr_adj$suffix, '.svg')),
+    width = 10, height = eh$height)
 }
 
 ## Heatmaps w/ 12 plasma samples w/o SARS-CoV-2 ----

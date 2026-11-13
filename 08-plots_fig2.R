@@ -27,10 +27,6 @@ source("r-utils/r-overview.R")
 #   categories and log2FC correlation).
 # - GSEA (HALLMARK) lollipop plots by GeneRatio and NES.
 # - log2FC heatmaps of selected pathways.
-#
-# Where two options exist, both are run and labelled:
-# - [SUBMITTED] reproduces the version sent for review.
-# - [REVISED]   corrected/alternative version.
 
 # User-defined parameters ----
 
@@ -179,39 +175,18 @@ save_sars_pca <- function(pca_res, title, prefix) {
 }
 
 # Gene categories of the scatter plot.
-# [SUBMITTED] 'lfc': categories defined only by |log2FC| >= LFC_CUT in each
-#   comparison (genes already filtered by padj < PADJ_CUT in any comparison).
-classify_lfc <- function(dt) {
-  dt[, fcase(
-    padj.inac_vs_no_sars > PADJ_CUT & padj.inf_vs_no_sars > PADJ_CUT,
-      'non-significant',
-    abs(log2FoldChange.inac_vs_no_sars) < LFC_CUT & abs(log2FoldChange.inf_vs_no_sars) < LFC_CUT,
-      'non-significant',
-    (log2FoldChange.inac_vs_no_sars >= LFC_CUT & log2FoldChange.inf_vs_no_sars >= LFC_CUT) |
-      (log2FoldChange.inac_vs_no_sars <= -LFC_CUT & log2FoldChange.inf_vs_no_sars <= -LFC_CUT),
-      'shared-gene',
-    abs(log2FoldChange.inf_vs_no_sars) < LFC_CUT,
-    'inactivated sars specific',
-    abs(log2FoldChange.inac_vs_no_sars) < LFC_CUT,
-    'infectious sars specific',
-    default = 'divergent genes')]
-}
-
-# [REVISED] 'sig': a gene changes in a comparison if padj < PADJ_CUT and
+#   'sig': a gene changes in a comparison if padj < PADJ_CUT and
 #   |log2FC| >= LFC_CUT. 'specific' also requires a significant difference in
 #   the direct comparison infectious vs inactivated; genes changing in one
 #   comparison only, without that difference, are 'ambiguous'.
-classify_sig <- function(dt) {
-  sig_inac <- dt$padj.inac_vs_no_sars < PADJ_CUT & abs(dt$log2FoldChange.inac_vs_no_sars) >= LFC_CUT
-  sig_inf  <- dt$padj.inf_vs_no_sars  < PADJ_CUT & abs(dt$log2FoldChange.inf_vs_no_sars)  >= LFC_CUT
-  #sig_diff <- dt$padj.inf_vs_inac < PADJ_CUT
-  same_dir <- sign(dt$log2FoldChange.inac_vs_no_sars) == sign(dt$log2FoldChange.inf_vs_no_sars)
+classify_gene <- function(dt) {
+  sig_inac <- dt$padj_inac_vs_no_sars < PADJ_CUT
+  sig_inf  <- dt$padj_inf_vs_no_sars  < PADJ_CUT
+  same_dir <- sign(dt$lfc_inac_vs_no_sars) == sign(dt$lfc_inf_vs_no_sars)
 
   fcase(
     sig_inac & sig_inf & same_dir,  'shared-gene',
     sig_inac & sig_inf,             'divergent genes',
-    #sig_inac & !sig_inf & sig_diff, 'inactivated sars specific',
-    #!sig_inac & sig_inf & sig_diff, 'infectious sars specific',
     sig_inac & !sig_inf,            'inactivated sars specific',
     !sig_inac & sig_inf,            'infectious sars specific',
     sig_inac | sig_inf,             'ambiguous',
@@ -221,8 +196,8 @@ classify_sig <- function(dt) {
 # Pearson correlation (r, r², 95% CI, p-value) between both log2FC, plus
 # Spearman's rho as a robustness check against outliers.
 cor_lfc <- function(dt, gene_set) {
-  x <- dt$log2FoldChange.inac_vs_no_sars
-  y <- dt$log2FoldChange.inf_vs_no_sars
+  x <- dt$lfc_inac_vs_no_sars
+  y <- dt$lfc_inf_vs_no_sars
   ct <- cor.test(x, y, method = 'pearson')
 
   data.table(
@@ -256,8 +231,8 @@ resultsNames(dds)
 ## Overview w/ vst data ----
 
 vsd <- DESeq2::vst(
-  dds,           # normalized counts cannot be used as input
-  blind = FALSE, # use the design to estimate the dispersion trend
+  dds,
+  blind = FALSE,
   fitType = 'parametric',
   nsub = 1000)
 
@@ -292,7 +267,7 @@ save_sars_pca(
   title = 'PCA on vst data for sars effect analysis',
   prefix = 'pca-prcomp')
 
-### PCAs, DESeq2-normalized counts [SUBMITTED] ----
+### PCAs, DESeq2-normalized counts ----
 # Goal: reproduce the submitted PCA (top 500 most variable genes on
 # DESeq2-normalized counts, linear scale). Without a log transformation the
 # variance is dominated by highly expressed genes.
@@ -301,16 +276,6 @@ save_sars_pca(
   run_pca_top_var(counts(dds, normalized = TRUE)),
   title = 'PCA on DESeq2 normalized data for sars effect analysis',
   prefix = 'pca-prcomp_DESeqNorm')
-
-### PCAs, log2-CPM values [REVISED] ----
-# Goal: select the top 500 most variable genes and run the PCA on the same
-# scale (TMM-normalized log2-CPM), so that gene selection is not driven by
-# the mean-variance relationship of raw counts.
-
-save_sars_pca(
-  run_pca_lcpm(counts(dds)),
-  title = 'PCA on log2-CPM data for sars effect analysis',
-  prefix = 'pca-prcomp_log2CPM')
 
 ## Load DE tables ----
 
@@ -352,30 +317,30 @@ setnames(
   diff_cmp,
   c('padj_inactivated_sars_vs_no_sars', 'padj_infectious_sars_vs_no_sars',
     'log2FoldChange_inactivated_sars_vs_no_sars', 'log2FoldChange_infectious_sars_vs_no_sars'),
-  c('padj.inac_vs_no_sars', 'padj.inf_vs_no_sars',
-    'log2FoldChange.inac_vs_no_sars', 'log2FoldChange.inf_vs_no_sars'))
+  c('padj_inac_vs_no_sars', 'padj_inf_vs_no_sars',
+    'lfc_inac_vs_no_sars', 'lfc_inf_vs_no_sars'))
 
-# padj of the direct comparison (used by the [REVISED] classification).
+# (Optional) padj of the direct comparison.
 diff_cmp <- merge(
   diff_cmp,
-  de_tables[cmp == 'infectious_sars_vs_inactivated_sars', .(id, padj.inf_vs_inac = padj)],
+  de_tables[cmp == 'infectious_sars_vs_inactivated_sars', .(id, padj_inf_vs_inac = padj)],
   by = 'id',
   all.x = TRUE)
 
 # All genes w/ log2FC in both comparisons (reference set for the correlation).
-diff_all <- na.omit(diff_cmp, cols = c('log2FoldChange.inac_vs_no_sars', 'log2FoldChange.inf_vs_no_sars'))
+diff_all <- na.omit(diff_cmp, cols = c('lfc_inac_vs_no_sars', 'lfc_inf_vs_no_sars'))
 
 # Missing log2FC -> 0 (no change); missing padj -> 1 (not significant).
-setnafill(diff_cmp, fill = 0, cols = c('log2FoldChange.inac_vs_no_sars', 'log2FoldChange.inf_vs_no_sars'))
-setnafill(diff_cmp, fill = 1, cols = c('padj.inac_vs_no_sars', 'padj.inf_vs_no_sars', 'padj.inf_vs_inac'))
+setnafill(diff_cmp, fill = 0, cols = c('lfc_inac_vs_no_sars', 'lfc_inf_vs_no_sars'))
+setnafill(diff_cmp, fill = 1, cols = c('padj_inac_vs_no_sars', 'padj_inf_vs_no_sars', 'padj_inf_vs_inac'))
 
-# Keep genes significant in any comparison.
-diff_cmp <- diff_cmp[padj.inac_vs_no_sars < PADJ_CUT | padj.inf_vs_no_sars < PADJ_CUT]
+# (Optional) Keep genes significant in any comparison. set: TRUE/FALSE
+# diff_cmp <- diff_cmp[padj_inac_vs_no_sars < PADJ_CUT | padj_inf_vs_no_sars < PADJ_CUT]
 
 # Label genes w/ large log2FC (Ensembl ID when there is no symbol).
 diff_cmp[, GENELAB := fcoalesce(features_db$GENELAB[match(id, features_db$GENEID)], id)]
 diff_cmp[, gene_label := fifelse(
-  abs(log2FoldChange.inac_vs_no_sars) >= 2 | abs(log2FoldChange.inf_vs_no_sars) >= 2, GENELAB, '')]
+(abs(lfc_inac_vs_no_sars) >= 1.5 & padj_inac_vs_no_sars <= 0.05) | (abs(lfc_inf_vs_no_sars) >= 1.5 & padj_inf_vs_no_sars <= 0.05), GENELAB, '')]
 
 ### Correlation of log2FC ----
 
@@ -394,64 +359,60 @@ fwrite(
   file.path(output_path, 'scatterplot_sars_effect-inac.inf_vs_no-sars_padj-NA.tsv'),
   sep = '\t')
 
-### Gene categories [SUBMITTED] and [REVISED] ----
-# Goal: plot and count the gene categories with both classifications. The
-# [SUBMITTED] version keeps the original file names.
+### Gene categories  ----
+# Goal: plot and count the gene categories with both classifications.
 
 col_plot <- c(
-  'non-significant' = 'grey',
   'shared-gene' = 'firebrick',
   'divergent genes' = 'black',
   'inactivated sars specific' = 'green4',
   'infectious sars specific' = 'dodgerblue',
-  'ambiguous' = 'grey60')
+  'non-significant' = 'grey',
+  'ambiguous' = 'pink')
 
 classifications <- list(
-  submitted = list(fun = classify_lfc, suffix = ''),
-  revised   = list(fun = classify_sig, suffix = '_sig-based'))
+  fun = classify_gene, suffix = '_lfc_sig-based')
 
-for (cl in names(classifications)) {
+dt <- copy(diff_cmp)
+dt[, analysis := classifications$fun(dt)]
 
-  dt <- copy(diff_cmp)
-  dt[, analysis := classifications[[cl]]$fun(dt)]
+scatter_summary <- dt[, .N, by = analysis][order(-N)]
+scatter_summary <- rbind(
+  scatter_summary,
+  data.table(analysis = 'total significant in any comparison', N = nrow(dt)))
+print(scatter_summary)
 
-  scatter_summary <- dt[, .N, by = analysis][order(-N)]
-  scatter_summary <- rbind(
-    scatter_summary,
-    data.table(analysis = 'total significant in any comparison', N = nrow(dt)))
-  message('Gene categories [', toupper(cl), ']')
-  print(scatter_summary)
+dt$analysis <- factor(
+  dt$analysis,
+  levels = rev(names(col_plot))
+)
+setkey(dt, "analysis")
 
-  p <- ggplot(dt, aes(
-    x = log2FoldChange.inac_vs_no_sars,
-    y = log2FoldChange.inf_vs_no_sars,
-    label = gene_label,
-    col = analysis)) +
-    geom_point(size = 0.5) +
-    ggrepel::geom_text_repel(size = 3, max.overlaps = 30) +
-    geom_hline(yintercept = c(-LFC_CUT, LFC_CUT), linetype = 'dotted') +
-    geom_vline(xintercept = c(-LFC_CUT, LFC_CUT), linetype = 'dotted') +
-    scale_color_manual(values = col_plot) +
-    theme_minimal() +
-    theme(legend.position = 'bottom') +
-    guides(color = guide_legend(ncol = 3))
+p <- ggplot(dt, aes(
+  x = lfc_inac_vs_no_sars,
+  y = lfc_inf_vs_no_sars,
+  label = gene_label,
+  col = analysis)) +
+  geom_point(size = 0.5) +
+  ggrepel::geom_text_repel(size = 3, max.overlaps = 30) +
+  geom_hline(yintercept = c(-LFC_CUT, LFC_CUT), linetype = 'dotted') +
+  geom_vline(xintercept = c(-LFC_CUT, LFC_CUT), linetype = 'dotted') +
+  scale_color_manual(values = col_plot) +
+  theme_minimal() +
+  theme(legend.position = 'bottom') +
+  guides(color = guide_legend(ncol = 3))
 
-  file_base <- file.path(
-    output_path,
-    paste0('scatterplot_sars_effect-inac.inf_vs_no-sars', classifications[[cl]]$suffix))
+file_base <- file.path(
+  output_path,
+  paste0('scatterplot_sars_effect-inac.inf_vs_no-sars', classifications$suffix))
 
-  save_svg_plot(p, paste0(file_base, '.svg'), width = 7, height = 7)
-  fwrite(dt, paste0(file_base, '.tsv'), sep = '\t')
-  fwrite(scatter_summary, paste0(file_base, '_summary.tsv'), sep = '\t')
-}
+save_svg_plot(p, paste0(file_base, '.svg'), width = 8, height = 8)
+fwrite(dt, paste0(file_base, '.tsv'), sep = '\t')
+fwrite(scatter_summary, paste0(file_base, '_summary.tsv'), sep = '\t')
 
 ## GSEA lollipop plots ----
 # Goal: plot the significant HALLMARK terms of every comparison, by
 # GeneRatio and by NES, with both x-axis options:
-# - [SUBMITTED] fixed limits (+/-0.55 GeneRatio, +/-2.5 NES): terms outside
-#   are dropped by ggplot. Original file names.
-# - [REVISED] limits widened when needed ('_auto-limits').
-# Terms outside the fixed limits are saved in '_out-of-range.tsv'.
 
 for (cmp in names(comparisons)) {
 
